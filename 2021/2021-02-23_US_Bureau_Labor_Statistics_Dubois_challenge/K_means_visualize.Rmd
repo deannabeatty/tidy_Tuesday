@@ -1,5 +1,5 @@
 ---
-title: "K-means to visualize industry and occupation /nUS Bureau of Labor Statistics 2015 - 2020 for TidyTuesday"
+title: "K-means to visualize industry and occupation of jobs \n from the US Bureau of Labor Statistics (2015 - 2020)"
 author: "Deanna Beatty"
 date: "2/27/2021"
 output: html_document
@@ -116,6 +116,8 @@ https://www.bls.gov/cps/tables.htm#charemp_m
 Julia Silge's k-means tutorial was used to run analysis:
 https://juliasilge.com/blog/kmeans-employment/ 
 
+plotly interactive plots (data were centered and log scale transformed to aid visualization)
+
 ```{r visualize k-means, out.width = "100%"}
 
 p1 <- augment(final_clust, employment_demographics) %>%
@@ -123,8 +125,10 @@ p1 <- augment(final_clust, employment_demographics) %>%
   geom_point() +
   ylab("Proportion of total US White population") +
   xlab("Total US population") +
-  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
-          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+  labs(title = "K-means clustering by industry and occupation \nUS Bureau of Labor Statistics 2015 - 2020", 
+          subtitle = "Scales are log transformed and centered", hjust = 0.5 ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
 
 ggplotly(p1, height = 500)
 
@@ -133,8 +137,10 @@ p2 <- augment(final_clust, employment_demographics) %>%
   geom_point() +
   ylab("Proportion of total US Asian population") +
   xlab("Total US population") +
-  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
-          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+  labs(title = "K-means clustering by industry and occupation \nUS Bureau of Labor Statistics 2015 - 2020", 
+          subtitle = "Scales are log transformed and centered") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
 
 ggplotly(p2, height = 500)
 
@@ -143,8 +149,10 @@ p3 <- augment(final_clust, employment_demographics) %>%
   geom_point() + 
   ylab("Proportion of total US Black or African American population") +
   xlab("Total US population") +
-  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
-          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+  labs(title = "K-means clustering by industry and occupation \nUS Bureau of Labor Statistics 2015 - 2020", 
+       subtitle = "Scales are log transformed and centered") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
 
 ggplotly(p3, height = 500)
 
