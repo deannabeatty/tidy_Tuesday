@@ -1,0 +1,151 @@
+---
+title: "K-means to visualize industry and occupation /nUS Bureau of Labor Statistics 2015 - 2020 for TidyTuesday"
+author: "Deanna Beatty"
+date: "2/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(eval = TRUE, echo = FALSE, include = TRUE, fig.show=TRUE) #global options
+```
+
+Package versions: tidyverse, tidytuesdayR, broom, plotly
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse); packageVersion("tidyverse")
+library(tidytuesdayR); packageVersion("tidytuesdayR")
+library(broom); packageVersion("broom")
+library(plotly); packageVersion("plotly")
+
+```
+
+```{r, get data, warning=FALSE, message=FALSE}
+# US Bureau of Labor Statistics
+# https://www.bls.gov/careeroutlook/2018/article/blacks-in-the-labor-force.htm
+# https://www.bls.gov/cps/tables.htm#charemp_m
+# https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-02-23/readme.md
+# https://juliasilge.com/blog/kmeans-employment/
+
+tuesdata <- tidytuesdayR::tt_load('2021-02-23')
+
+employed <- tuesdata$employed
+earn <- tuesdata$earn
+
+```
+
+```{r, tidy and mutate data, warning=FALSE, message=FALSE}
+
+# tidy data and create an occupation column (combined values from industry & minor occupation)
+# group by occupation and race_gender and summarize the mean number employed (n) for each group
+employed_tidy <- employed %>%
+  filter(!is.na(employ_n)) %>%
+  group_by(occupation = paste(industry, minor_occupation), race_gender) %>%
+  summarise(n = mean(employ_n)) %>%
+  ungroup()
+
+# center and scale the variables
+# the proportions of each category who are Asian, Black, or white
+# and the total number of people in each category.
+employment_demographics <- employed_tidy %>%
+  filter(race_gender %in% c("White", "Black or African American", "Asian")) %>%
+  pivot_wider(names_from = race_gender, values_from = n, values_fill = 0) %>%
+  janitor::clean_names() %>%
+  left_join(employed_tidy %>%
+              filter(race_gender == "TOTAL") %>%
+              select(-race_gender) %>%
+              rename(total = n)) %>%
+  filter(total > 1e3) %>% # excluding data with fewer than 1000 total people
+  mutate(across(c(asian, black_or_african_american, white), ~ . / (total)), # create proportion of total
+         total = log(total), # log transform total counts to deal with scale issues
+         across(where(is.numeric), ~ as.numeric(scale(.)))) %>%
+  mutate(occupation = snakecase::to_snake_case(occupation))
+
+```
+
+```{r k-means analysis, include = FALSE, fig.show=FALSE}
+
+# unsupervised clustering k-means 3 clusters to start
+employment_clusters <- kmeans(select(employment_demographics, -occupation), centers = 3) # remove labels 
+summary(employment_clusters)
+
+# tidy the results for easier viewing
+tidy(employment_clusters)
+
+# use augment to visualize clusters with employment demographics
+# clustering of occupation by proportion to total for black_or_african_american
+augment(employment_clusters, employment_demographics) %>%
+  ggplot(aes(total, black_or_african_american, color = .cluster)) +
+  geom_point()
+
+# clustering of occupation by proportion to total for asian
+augment(employment_clusters, employment_demographics) %>%
+  ggplot(aes(total, asian, color = .cluster)) +
+  geom_point()
+
+# clustering of occupation by proportion to total for white
+augment(employment_clusters, employment_demographics) %>%
+  ggplot(aes(total, white, color = .cluster)) +
+  geom_point()
+
+# how to determine the best number of clusters
+# 1-9 clusters
+kclusts <-
+  tibble(k = 1:9) %>%
+  mutate(
+    kclust = map(k, ~ kmeans(select(employment_demographics, -occupation), .x)),
+    glanced = map(kclust, glance),
+  )
+
+kclusts %>%
+  unnest(cols = c(glanced)) %>%
+  ggplot(aes(k, tot.withinss)) +
+  geom_line(alpha = 0.5, size = 1.2, color = "midnightblue") +
+  geom_point(size = 2, color = "midnightblue")
+
+# 4-5 clusters might be good
+
+final_clust <- kmeans(select(employment_demographics, -occupation), centers = 5)
+
+```
+
+Data provided from TidyTuesday week 9 on 2021-02-23: https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-02-23/readme.md 
+
+Data are from the US Bureau of Labor Statistics 2015 - 2020
+https://www.bls.gov/careeroutlook/2018/article/blacks-in-the-labor-force.htm
+https://www.bls.gov/cps/tables.htm#charemp_m
+
+Julia Silge's k-means tutorial was used to run analysis:
+https://juliasilge.com/blog/kmeans-employment/ 
+
+```{r visualize k-means, out.width = "100%"}
+
+p1 <- augment(final_clust, employment_demographics) %>%
+  ggplot(aes(total, white, color = .cluster, name = occupation)) +
+  geom_point() +
+  ylab("Proportion of total US White population") +
+  xlab("Total US population") +
+  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
+          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+
+ggplotly(p1, height = 500)
+
+p2 <- augment(final_clust, employment_demographics) %>%
+  ggplot(aes(total, asian, color = .cluster, name = occupation)) +
+  geom_point() +
+  ylab("Proportion of total US Asian population") +
+  xlab("Total US population") +
+  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
+          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+
+ggplotly(p2, height = 500)
+
+p3 <- augment(final_clust, employment_demographics) %>%
+  ggplot(aes(total, black_or_african_american, color = .cluster, name = occupation)) +
+  geom_point() + 
+  ylab("Proportion of total US Black or African American population") +
+  xlab("Total US population") +
+  labs(title = "K-means clustering by industry and occupation, US Bureau of Labor Statistics 2015 - 2020", 
+          subtitle = "Scales are log transformed and centered", hjust = 0.5 )
+
+ggplotly(p3, height = 500)
+
+```
